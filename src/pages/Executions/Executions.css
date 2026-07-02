@@ -1,0 +1,171 @@
+/* Executions page styles */
+
+.executions-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.executions-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.executions-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+}
+
+.executions-title-row h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 2vw + 1rem, 2.4rem);
+  letter-spacing: -0.04em;
+}
+
+.pill-inline {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  margin-left: 12px;
+  vertical-align: middle;
+}
+
+/* Table */
+.executions-table-wrapper {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+}
+
+.executions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.executions-table thead {
+  background: var(--soft-bg);
+}
+
+.executions-table th {
+  text-align: left;
+  padding: 14px 18px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.executions-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--card-border);
+  color: var(--ink);
+}
+
+.executions-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.executions-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.executions-table tbody tr:hover {
+  background: var(--soft-bg);
+}
+
+/* Row status indicators */
+.exec-row.status-error {
+  border-left: 3px solid var(--danger);
+}
+
+.exec-row.status-success {
+  border-left: 3px solid var(--success);
+}
+
+.exec-row.status-running {
+  border-left: 3px solid var(--accent);
+}
+
+.exec-row.status-unknown {
+  border-left: 3px solid var(--card-border);
+}
+
+/* Status badge */
+.exec-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.exec-status.success {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+.exec-status.error {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, white);
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
+}
+
+.exec-status.running {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.exec-status.unknown {
+  color: var(--muted);
+  background: var(--soft-bg);
+  border: 1px solid var(--card-border);
+}
+
+/* Cell formatting */
+.exec-id {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.exec-date {
+  white-space: nowrap;
+}
+
+.exec-duration {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.exec-mode {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+@media (max-width: 720px) {
+  .executions-table th,
+  .executions-table td {
+    padding: 10px 12px;
+  }
+
+  .executions-table {
+    font-size: 0.84rem;
+  }
+}

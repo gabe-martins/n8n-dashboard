@@ -1,0 +1,179 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { requestJson } from '../../services/api';
+import './Dashboard.css';
+
+const REFRESH_INTERVAL_MS = 30000;
+
+function Dashboard({ user, onLogout, onSelectWorkflow }) {
+  const [workflows, setWorkflows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [busyIds, setBusyIds] = useState({});
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [n8nStatus, setN8nStatus] = useState({ connected: true, message: '' });
+
+  const markBusy = (id, isBusy) => {
+    setBusyIds((prev) => ({
+      ...prev,
+      [id]: isBusy,
+    }));
+  };
+
+  const loadWorkflows = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const payload = await requestJson('/api/n8n/workflows?limit=250');
+      const items = Array.isArray(payload?.data) ? payload.data : [];
+
+      setWorkflows(items);
+      setN8nStatus({ connected: true, message: '' });
+      setLastUpdated(new Date());
+    } catch (err) {
+      setError(err?.message || 'Falha ao carregar workflows.');
+      setN8nStatus({ connected: false, message: err?.message || '' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const sortedWorkflows = useMemo(() => {
+    return [...workflows].sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [workflows]);
+
+  useEffect(() => {
+    loadWorkflows();
+
+    // Keep the dashboard reasonably fresh without requiring a manual refresh.
+    const interval = setInterval(loadWorkflows, REFRESH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [loadWorkflows]);
+
+  const handleToggle = async (workflow) => {
+    const targetAction = workflow.active ? 'deactivate' : 'activate';
+    markBusy(workflow.id, true);
+    setError('');
+
+    try {
+      await requestJson(`/api/n8n/workflows/${workflow.id}/${targetAction}`, {
+        method: 'POST',
+      });
+
+      setWorkflows((prev) =>
+        prev.map((item) =>
+          item.id === workflow.id
+            ? {
+                ...item,
+                active: !workflow.active,
+              }
+            : item
+        )
+      );
+    } catch (err) {
+      setError(err?.message || 'Falha ao atualizar workflow.');
+    } finally {
+      markBusy(workflow.id, false);
+    }
+  };
+
+  return (
+    <div className="app">
+      <div className="app-shell">
+        <header className="app-header">
+          <div>
+            <p className="eyebrow">N8N control</p>
+            <h1>Workflows dashboard</h1>
+            <p className="subtitle">
+              Olá, <strong>{user.name}</strong>
+            </p>
+          </div>
+          <div className="header-actions">
+            <button
+              className="btn ghost"
+              onClick={loadWorkflows}
+              disabled={loading}
+            >
+              {loading ? 'Carregando...' : 'Atualizar'}
+            </button>
+            <button className="btn ghost" onClick={onLogout}>
+              Sair
+            </button>
+            <div className={`status-chip ${n8nStatus.connected ? 'ok' : 'warn'}`}>
+              {n8nStatus.connected ? 'Ready' : 'Indisponível'}
+            </div>
+            {lastUpdated && (
+              <span className="timestamp">
+                Updated {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+        </header>
+
+        {!n8nStatus.connected && (
+          <div className="banner">
+            Não foi possível conectar ao n8n. Verifique `N8N_API_KEY` e `N8N_BASE_URL`
+            na configuração do backend.
+          </div>
+        )}
+
+        {error && <div className="banner error">{error}</div>}
+
+        <section className="cards-grid">
+          {sortedWorkflows.map((workflow) => {
+            const isBusy = Boolean(busyIds[workflow.id]);
+            return (
+              <article
+                key={workflow.id}
+                className={`card clickable ${workflow.active ? 'active' : 'inactive'}`}
+                onClick={() => onSelectWorkflow && onSelectWorkflow(workflow)}
+              >
+                <div className="card-header">
+                  <h2>{workflow.name || 'Untitled workflow'}</h2>
+                  <span
+                    className={`pill ${workflow.active ? 'pill-active' : 'pill-inactive'}`}
+                  >
+                    {workflow.active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <div className="meta">
+                  <div>
+                    <span className="label">Updated</span>
+                    <span>
+                      {workflow.updatedAt
+                        ? new Date(workflow.updatedAt).toLocaleString()
+                        : 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+                <div className="card-actions">
+                  <button
+                    className="btn ghost"
+                    onClick={(e) => { e.stopPropagation(); handleToggle(workflow); }}
+                    disabled={isBusy}
+                  >
+                    {isBusy ? 'Working...' : workflow.active ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+
+          {!loading && sortedWorkflows.length === 0 && !error && (
+            <div className="empty-state">No workflows found.</div>
+          )}
+
+          {loading && workflows.length === 0 && (
+            <div className="empty-state">Loading workflows...</div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export default Dashboard;

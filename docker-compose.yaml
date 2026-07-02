@@ -1,0 +1,119 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: n8n-dashboard-db
+    restart: unless-stopped
+    # This database only holds the dashboard's own (tiny) users table, so the
+    # stock defaults (100 connections, 128MB shared_buffers) are oversized for
+    # this workload and this host. Trim them down to fit a memory-constrained
+    # server without hurting normal operation.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=16MB
+      - -c
+      - max_connections=20
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-n8n_dashboard}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dashboard-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-n8n_dashboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: n8n-dashboard-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # Cap V8's heap so a leak/spike gets GC'd or the process restarts
+      # instead of slowly pushing this memory-constrained host into swap.
+      NODE_OPTIONS: --max-old-space-size=160
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-n8n_dashboard}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_POOL_MAX: ${DB_POOL_MAX:-5}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://${LOCAL_HOST:-localhost}:3000}
+      N8N_BASE_URL: ${N8N_BASE_URL:-http://host.docker.internal:5678}
+      N8N_API_KEY: ${N8N_API_KEY:-}
+      N8N_API_HEADER: ${N8N_API_HEADER:-X-N8N-API-KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dashboard-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 96M
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-http://localhost:4000}
+    container_name: n8n-dashboard-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - dashboard-network
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+        reservations:
+          memory: 16M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  dashboard-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
