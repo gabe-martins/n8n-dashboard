@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const compression = require('compression');
 const authRoutes = require('./routes/auth');
 const n8nRoutes = require('./routes/n8n');
+const usersRoutes = require('./routes/users');
 const pool = require('./db');
 const { runMigrations } = require('./db/migrate');
 
@@ -48,6 +49,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/n8n', n8nRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {

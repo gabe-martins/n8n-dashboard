@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Executions from './pages/Executions';
 import Monitoring from './pages/Monitoring';
+import Users from './pages/Users';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -12,6 +13,7 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
   const [showMonitoring, setShowMonitoring] = useState(false);
+  const [showUsers, setShowUsers] = useState(false);
 
   // Check existing token on mount
   useEffect(() => {
@@ -89,6 +91,7 @@ function App() {
     setUser(null);
     setSelectedWorkflow(null);
     setShowMonitoring(false);
+    setShowUsers(false);
   };
 
   // Show loading while checking auth
@@ -122,6 +125,11 @@ function App() {
     return <Monitoring onBack={() => setShowMonitoring(false)} />;
   }
 
+  // Admin-only user management screen (access is also enforced server-side).
+  if (showUsers) {
+    return <Users currentUser={user} onBack={() => setShowUsers(false)} />;
+  }
+
   // Show dashboard for authenticated users
   return (
     <Dashboard
@@ -129,6 +137,7 @@ function App() {
       onLogout={handleLogout}
       onSelectWorkflow={setSelectedWorkflow}
       onOpenMonitoring={() => setShowMonitoring(true)}
+      onOpenUsers={() => setShowUsers(true)}
     />
   );
 }

@@ -4,7 +4,7 @@ import './Dashboard.css';
 
 const REFRESH_INTERVAL_MS = 30000;
 
-function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring }) {
+function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring, onOpenUsers }) {
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -135,6 +135,11 @@ function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring }) {
             {isAdmin && (
               <button className="btn ghost" onClick={onOpenMonitoring}>
                 Monitoramento
+              </button>
+            )}
+            {isAdmin && (
+              <button className="btn ghost" onClick={onOpenUsers}>
+                Usuários
               </button>
             )}
             <button className="btn ghost" onClick={onLogout}>
