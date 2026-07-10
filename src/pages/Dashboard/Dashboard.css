@@ -97,7 +97,7 @@
   border-style: solid;
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 8%, white);
+  background: color-mix(in srgb, var(--danger) 8%, var(--card-bg));
 }
 
 .cards-grid {
@@ -161,13 +161,13 @@
 .pill-active {
   color: var(--success);
   border-color: color-mix(in srgb, var(--success) 30%, transparent);
-  background: color-mix(in srgb, var(--success) 10%, white);
+  background: color-mix(in srgb, var(--success) 10%, var(--card-bg));
 }
 
 .pill-inactive {
   color: var(--warning);
   border-color: color-mix(in srgb, var(--warning) 35%, transparent);
-  background: color-mix(in srgb, var(--warning) 10%, white);
+  background: color-mix(in srgb, var(--warning) 10%, var(--card-bg));
 }
 
 .pill-archived {

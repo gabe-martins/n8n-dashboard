@@ -4,7 +4,7 @@
   border-style: solid;
   border-color: color-mix(in srgb, var(--success) 40%, transparent);
   color: var(--success);
-  background: color-mix(in srgb, var(--success) 8%, white);
+  background: color-mix(in srgb, var(--success) 8%, var(--card-bg));
 }
 
 .user-form-card {

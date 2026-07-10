@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Executions from './pages/Executions';
 import Monitoring from './pages/Monitoring';
 import Users from './pages/Users';
+import ThemeToggle from './components/ThemeToggle';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -95,50 +96,50 @@ function App() {
   };
 
   // Show loading while checking auth
+  let content;
   if (authLoading) {
-    return (
+    content = (
       <div className="app">
         <div className="loading-screen">
           <p>Carregando...</p>
         </div>
       </div>
     );
-  }
-
-  // Show login if not authenticated
-  if (!user) {
-    return <Login onLogin={handleLogin} error={authError} loading={authLoading} />;
-  }
-
-  // Show executions if a workflow is selected
-  if (selectedWorkflow) {
-    return (
+  } else if (!user) {
+    // Show login if not authenticated
+    content = <Login onLogin={handleLogin} error={authError} loading={authLoading} />;
+  } else if (selectedWorkflow) {
+    // Show executions if a workflow is selected
+    content = (
       <Executions
         workflow={selectedWorkflow}
         onBack={() => setSelectedWorkflow(null)}
       />
     );
+  } else if (showMonitoring) {
+    // Admin-only monitoring screen (access is also enforced server-side).
+    content = <Monitoring onBack={() => setShowMonitoring(false)} />;
+  } else if (showUsers) {
+    // Admin-only user management screen (access is also enforced server-side).
+    content = <Users currentUser={user} onBack={() => setShowUsers(false)} />;
+  } else {
+    // Show dashboard for authenticated users
+    content = (
+      <Dashboard
+        user={user}
+        onLogout={handleLogout}
+        onSelectWorkflow={setSelectedWorkflow}
+        onOpenMonitoring={() => setShowMonitoring(true)}
+        onOpenUsers={() => setShowUsers(true)}
+      />
+    );
   }
 
-  // Admin-only monitoring screen (access is also enforced server-side).
-  if (showMonitoring) {
-    return <Monitoring onBack={() => setShowMonitoring(false)} />;
-  }
-
-  // Admin-only user management screen (access is also enforced server-side).
-  if (showUsers) {
-    return <Users currentUser={user} onBack={() => setShowUsers(false)} />;
-  }
-
-  // Show dashboard for authenticated users
   return (
-    <Dashboard
-      user={user}
-      onLogout={handleLogout}
-      onSelectWorkflow={setSelectedWorkflow}
-      onOpenMonitoring={() => setShowMonitoring(true)}
-      onOpenUsers={() => setShowUsers(true)}
-    />
+    <>
+      <ThemeToggle />
+      {content}
+    </>
   );
 }
 
