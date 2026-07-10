@@ -1,0 +1,204 @@
+/* Monitoring page styles (admin-only execution history & charts) */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.kpi-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow);
+}
+
+.kpi-card strong {
+  font-size: 1.8rem;
+  letter-spacing: -0.03em;
+}
+
+.kpi-card .kpi-danger {
+  color: var(--danger);
+}
+
+.section-title {
+  font-size: 1.1rem;
+  margin: 0 0 16px;
+  letter-spacing: -0.02em;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chart-card.wide {
+  grid-column: span 1;
+}
+
+.chart-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.chart-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Horizontal bar list (status breakdown / top workflows) */
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.bar-label {
+  color: var(--muted);
+}
+
+.bar-label.workflow-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--soft-bg);
+  overflow: hidden;
+}
+
+.bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.bar-fill.overlay {
+  z-index: 2;
+}
+
+.bar-fill.status-success {
+  background: var(--success);
+}
+
+.bar-fill.status-error,
+.bar-fill.status-crashed {
+  background: var(--danger);
+}
+
+.bar-fill.status-running,
+.bar-fill.status-waiting,
+.bar-fill.status-new {
+  background: var(--accent);
+}
+
+.bar-fill.status-canceled,
+.bar-fill.status-unknown {
+  background: var(--muted);
+}
+
+.bar-count {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.bar-pct {
+  color: var(--muted);
+}
+
+/* Timeline (bars per day) */
+.timeline-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 140px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.timeline-bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 22px;
+}
+
+.timeline-bar-track {
+  position: relative;
+  width: 18px;
+  height: 110px;
+  background: var(--soft-bg);
+  border-radius: 4px 4px 0 0;
+}
+
+.timeline-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+}
+
+.timeline-bar.total {
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+.timeline-bar.error {
+  background: var(--danger);
+}
+
+.timeline-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .bar-row {
+    grid-template-columns: 80px 1fr auto;
+  }
+}

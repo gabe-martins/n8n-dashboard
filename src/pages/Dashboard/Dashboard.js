@@ -4,13 +4,15 @@ import './Dashboard.css';
 
 const REFRESH_INTERVAL_MS = 30000;
 
-function Dashboard({ user, onLogout, onSelectWorkflow }) {
+function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring }) {
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [busyIds, setBusyIds] = useState({});
   const [lastUpdated, setLastUpdated] = useState(null);
   const [n8nStatus, setN8nStatus] = useState({ connected: true, message: '' });
+
+  const isAdmin = (user?.tag || '').toLowerCase() === 'admin';
 
   const markBusy = (id, isBusy) => {
     setBusyIds((prev) => ({
@@ -81,6 +83,36 @@ function Dashboard({ user, onLogout, onSelectWorkflow }) {
     }
   };
 
+  // Admin-only: archive/unarchive is a soft-delete on the n8n side, kept
+  // separate from the tag-scoped activate/deactivate flow above.
+  const handleArchiveToggle = async (workflow) => {
+    const targetAction = workflow.isArchived ? 'unarchive' : 'archive';
+    markBusy(workflow.id, true);
+    setError('');
+
+    try {
+      const updated = await requestJson(`/api/n8n/workflows/${workflow.id}/${targetAction}`, {
+        method: 'POST',
+      });
+
+      setWorkflows((prev) =>
+        prev.map((item) =>
+          item.id === workflow.id
+            ? {
+                ...item,
+                isArchived: updated?.isArchived ?? !workflow.isArchived,
+                active: updated?.active ?? item.active,
+              }
+            : item
+        )
+      );
+    } catch (err) {
+      setError(err?.message || 'Falha ao arquivar/desarquivar workflow.');
+    } finally {
+      markBusy(workflow.id, false);
+    }
+  };
+
   return (
     <div className="app">
       <div className="app-shell">
@@ -100,6 +132,11 @@ function Dashboard({ user, onLogout, onSelectWorkflow }) {
             >
               {loading ? 'Carregando...' : 'Atualizar'}
             </button>
+            {isAdmin && (
+              <button className="btn ghost" onClick={onOpenMonitoring}>
+                Monitoramento
+              </button>
+            )}
             <button className="btn ghost" onClick={onLogout}>
               Sair
             </button>
@@ -134,11 +171,16 @@ function Dashboard({ user, onLogout, onSelectWorkflow }) {
               >
                 <div className="card-header">
                   <h2>{workflow.name || 'Untitled workflow'}</h2>
-                  <span
-                    className={`pill ${workflow.active ? 'pill-active' : 'pill-inactive'}`}
-                  >
-                    {workflow.active ? 'Active' : 'Inactive'}
-                  </span>
+                  <div className="pill-group">
+                    {workflow.isArchived && (
+                      <span className="pill pill-archived">Archived</span>
+                    )}
+                    <span
+                      className={`pill ${workflow.active ? 'pill-active' : 'pill-inactive'}`}
+                    >
+                      {workflow.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
                 <div className="meta">
                   <div>
@@ -154,10 +196,19 @@ function Dashboard({ user, onLogout, onSelectWorkflow }) {
                   <button
                     className="btn ghost"
                     onClick={(e) => { e.stopPropagation(); handleToggle(workflow); }}
-                    disabled={isBusy}
+                    disabled={isBusy || workflow.isArchived}
                   >
                     {isBusy ? 'Working...' : workflow.active ? 'Deactivate' : 'Activate'}
                   </button>
+                  {isAdmin && (
+                    <button
+                      className="btn ghost"
+                      onClick={(e) => { e.stopPropagation(); handleArchiveToggle(workflow); }}
+                      disabled={isBusy}
+                    >
+                      {isBusy ? 'Working...' : workflow.isArchived ? 'Unarchive' : 'Archive'}
+                    </button>
+                  )}
                 </div>
               </article>
             );

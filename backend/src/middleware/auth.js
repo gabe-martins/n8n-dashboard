@@ -36,4 +36,14 @@ async function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth };
+// Blocks non-admin users from admin-only endpoints. Must run after requireAuth
+// so req.user is already populated (and freshly re-checked against the DB).
+function requireAdmin(req, res, next) {
+  const tag = (req.user?.tag || '').toLowerCase();
+  if (tag !== 'admin') {
+    return res.status(403).json({ message: 'Acesso restrito a administradores' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin };

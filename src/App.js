@@ -4,12 +4,14 @@ import { backendUrl } from './services/api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Executions from './pages/Executions';
+import Monitoring from './pages/Monitoring';
 
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
+  const [showMonitoring, setShowMonitoring] = useState(false);
 
   // Check existing token on mount
   useEffect(() => {
@@ -86,6 +88,7 @@ function App() {
     localStorage.removeItem('token');
     setUser(null);
     setSelectedWorkflow(null);
+    setShowMonitoring(false);
   };
 
   // Show loading while checking auth
@@ -114,12 +117,18 @@ function App() {
     );
   }
 
+  // Admin-only monitoring screen (access is also enforced server-side).
+  if (showMonitoring) {
+    return <Monitoring onBack={() => setShowMonitoring(false)} />;
+  }
+
   // Show dashboard for authenticated users
   return (
     <Dashboard
       user={user}
       onLogout={handleLogout}
       onSelectWorkflow={setSelectedWorkflow}
+      onOpenMonitoring={() => setShowMonitoring(true)}
     />
   );
 }

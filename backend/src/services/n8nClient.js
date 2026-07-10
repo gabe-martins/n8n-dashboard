@@ -89,6 +89,14 @@ async function deactivateWorkflow(id) {
   return n8nRequest(`/workflows/${encodeURIComponent(id)}/deactivate`, { method: 'POST' });
 }
 
+async function archiveWorkflow(id) {
+  return n8nRequest(`/workflows/${encodeURIComponent(id)}/archive`, { method: 'POST' });
+}
+
+async function unarchiveWorkflow(id) {
+  return n8nRequest(`/workflows/${encodeURIComponent(id)}/unarchive`, { method: 'POST' });
+}
+
 async function listExecutions({ workflowId, limit, cursor, status } = {}) {
   const params = new URLSearchParams();
   if (workflowId) params.set('workflowId', workflowId);
@@ -96,6 +104,31 @@ async function listExecutions({ workflowId, limit, cursor, status } = {}) {
   if (cursor) params.set('cursor', cursor);
   if (status) params.set('status', status);
   return n8nRequest(`/executions?${params.toString()}`);
+}
+
+// Loops the paginated /executions endpoint (server-side) to gather a bounded
+// batch of the most recent executions across ALL workflows, for admin-only
+// aggregate reporting. Capped by maxItems so a busy n8n instance can't force
+// this backend into an unbounded number of upstream requests.
+async function listExecutionsRange({ maxItems = 500, status } = {}) {
+  const pageLimit = 100;
+  const items = [];
+  let cursor;
+
+  while (items.length < maxItems) {
+    const payload = await listExecutions({
+      limit: Math.min(pageLimit, maxItems - items.length),
+      cursor,
+      status,
+    });
+    const pageItems = Array.isArray(payload?.data) ? payload.data : [];
+    items.push(...pageItems);
+
+    cursor = payload?.nextCursor || null;
+    if (!cursor || pageItems.length === 0) break;
+  }
+
+  return items;
 }
 
 async function checkStatus() {
@@ -117,6 +150,9 @@ module.exports = {
   getWorkflow,
   activateWorkflow,
   deactivateWorkflow,
+  archiveWorkflow,
+  unarchiveWorkflow,
   listExecutions,
+  listExecutionsRange,
   checkStatus,
 };
