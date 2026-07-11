@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestJson } from '../../services/api';
 import './Monitoring.css';
 
-const REFRESH_INTERVAL_MS = 60000;
+// Near-real-time polling: fast enough to feel "live" without hammering the
+// n8n API/backend on the memory-constrained production host. Paused while
+// the tab isn't visible (background tabs don't need live updates) and while
+// a request is already in flight, so a slow response can't pile up parallel
+// requests once the interval ticks again.
+const REFRESH_INTERVAL_MS = 5000;
 const HISTORY_PAGE_SIZE = 50;
 const STATS_WINDOW = 500;
 
@@ -155,6 +160,7 @@ function Monitoring({ onBack }) {
   const [nextCursor, setNextCursor] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState('');
+  const isRefreshingRef = useRef(false);
 
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
@@ -200,15 +206,42 @@ function Monitoring({ onBack }) {
     }
   };
 
-  const refreshAll = useCallback(() => {
-    loadStats();
-    loadHistory();
+  const refreshAll = useCallback(async () => {
+    // Guards against overlapping requests: if a refresh is still in flight
+    // when the next interval tick fires (e.g. a slow n8n response), skip
+    // this tick instead of piling up parallel requests.
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+    try {
+      await Promise.all([loadStats(), loadHistory()]);
+    } finally {
+      isRefreshingRef.current = false;
+    }
   }, [loadStats, loadHistory]);
 
   useEffect(() => {
     refreshAll();
-    const interval = setInterval(refreshAll, REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      // Skip polling while the tab is in the background — no one is
+      // watching, so there's no point spending backend/n8n API calls on it.
+      if (document.visibilityState === 'visible') {
+        refreshAll();
+      }
+    }, REFRESH_INTERVAL_MS);
+
+    // Refresh immediately when the tab regains focus so the view doesn't
+    // show stale data after being backgrounded for a while.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshAll();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [refreshAll]);
 
   const loading = statsLoading || historyLoading;
@@ -224,13 +257,17 @@ function Monitoring({ onBack }) {
             <button className="btn ghost" onClick={refreshAll} disabled={loading}>
               {loading ? 'Carregando...' : 'Atualizar'}
             </button>
+            <span className="live-indicator" title={`Atualização automática a cada ${REFRESH_INTERVAL_MS / 1000}s`}>
+              <span className="live-dot" /> Tempo real
+            </span>
           </div>
           <div className="executions-title-row">
             <div>
               <p className="eyebrow">Administração</p>
               <h1>Monitoramento de execuções</h1>
               <p className="subtitle">
-                Histórico e estatísticas de todas as execuções de todos os workflows.
+                Histórico e estatísticas de todas as execuções de todos os workflows, atualizadas
+                automaticamente a cada {REFRESH_INTERVAL_MS / 1000} segundos.
               </p>
             </div>
           </div>
