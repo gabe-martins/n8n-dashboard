@@ -1,0 +1,35 @@
+name: Deploy Continuo n8n
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do codigo
+        uses: actions/checkout@v4
+
+      - name: Executar deploy no servidor via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            # Entra na pasta que descobrimos no pwd
+            cd /home/gabe/n8n-dashboard
+            
+            # Garante que está na branch certa e puxa as novidades do GitHub
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Recria os containers apenas se houver alterações, buildando o que for necessário
+            docker compose up -d --build
+            
+            # Limpa imagens antigas para economizar espaço no seu servidor pessoal
+            docker image prune -f
