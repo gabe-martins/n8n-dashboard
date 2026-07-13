@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 const n8nRoutes = require('./routes/n8n');
 const usersRoutes = require('./routes/users');
@@ -25,6 +26,20 @@ app.use(compression());
 
 // HTTP request logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// Global rate limit for all API routes (in addition to the stricter,
+// login-specific limiter in routes/auth.js). Protects /api/n8n/* and
+// /api/users/* from abuse/scraping. /api/health is excluded so uptime
+// checks/monitoring never get throttled.
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_MAX) || 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/api/health',
+  message: { message: 'Muitas requisições. Tente novamente em instantes.' },
+});
+app.use('/api', apiLimiter);
 
 // CORS configuration - supports multiple origins separated by comma
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')

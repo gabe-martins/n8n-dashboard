@@ -66,6 +66,55 @@
   border-color: var(--danger);
 }
 
+.btn.danger-solid {
+  background: var(--danger);
+  color: white;
+  border-color: transparent;
+}
+
+.btn.danger-solid:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* Delete confirmation modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.modal-card h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+}
+
+.modal-card p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 @media (max-width: 720px) {
   .user-form {
     grid-template-columns: 1fr;

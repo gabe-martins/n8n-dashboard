@@ -17,6 +17,9 @@ yarn.lock
 /build
 /dist
 
+# Database backups (created on the server by backup-postgres.sh)
+/backups
+
 # Environment files
 .env
 .env.local

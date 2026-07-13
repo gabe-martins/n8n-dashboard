@@ -180,6 +180,42 @@ The project includes several helper scripts to simplify Docker operations:
 - **`docker-create-user.sh`** - Create a user in the running backend container
 - **`docker-logs.sh`** - View logs (optionally specify service name, e.g. `./docker-logs.sh backend`)
 
+### Production Deployment (remote server via WSL)
+
+`deploy-prod.sh` (repo root) automates deploying this repo to a remote production server over SSH. It must be run from **WSL**, not native Windows PowerShell, if the server is only reachable through a network (e.g. Tailscale) that's connected inside WSL rather than on the Windows host itself.
+
+**One-time setup:** add an SSH host alias in the WSL user's own `~/.ssh/config` (this file is local to the machine and never committed to the repo):
+
+```
+Host n8n-dashboard-prod
+    HostName <server-ip-or-hostname>
+    User <ssh-user>
+    IdentityFile ~/.ssh/<your-key>
+    IdentitiesOnly yes
+```
+
+**Usage** (from a PowerShell terminal, delegating to WSL):
+
+```powershell
+# Rebuild & restart backend + frontend (default)
+wsl -d Ubuntu -- bash -lc "cd /path/to/n8n-dashboard && ./deploy-prod.sh"
+
+# Rebuild & restart a single service only
+wsl -d Ubuntu -- bash -lc "cd /path/to/n8n-dashboard && ./deploy-prod.sh backend"
+wsl -d Ubuntu -- bash -lc "cd /path/to/n8n-dashboard && ./deploy-prod.sh frontend"
+```
+
+What it does automatically:
+1. Verifies SSH connectivity to the configured host alias.
+2. Packages the repo into a `.tar.gz`, excluding `.git`, `node_modules`, `build`, and **`.env*`** (the server's own production `.env` is never overwritten).
+3. Uploads the archive via `scp` and extracts it over the remote deployment directory.
+4. Runs `docker compose up -d --build <services>` on the server.
+5. Prints `docker compose ps` so you can confirm all containers are `healthy`.
+
+Env var overrides: `N8N_DEPLOY_HOST` (use a different SSH alias) and `N8N_DEPLOY_REMOTE_DIR` (use a different remote directory).
+
+> **Note:** since `.env*` is excluded from the sync, any environment variable changes (e.g. `REACT_APP_BACKEND_URL`, `CORS_ORIGIN`) must be applied manually to the `.env` file on the server itself.
+
 ## 📁 Project Structure
 
 ```

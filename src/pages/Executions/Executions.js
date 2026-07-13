@@ -1,13 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { requestJson } from '../../services/api';
 import './Executions.css';
 
 const REFRESH_INTERVAL_MS = 15000;
 
+const STATUS_FILTERS = [
+  { value: 'all', label: 'Todos os status' },
+  { value: 'success', label: 'Sucesso' },
+  { value: 'error', label: 'Erro' },
+  { value: 'running', label: 'Executando' },
+  { value: 'unknown', label: 'Desconhecido' },
+];
+
 function Executions({ workflow, onBack }) {
   const [executions, setExecutions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const loadExecutions = useCallback(async () => {
     if (!workflow?.id) return;
@@ -68,6 +77,13 @@ function Executions({ workflow, onBack }) {
     return status;
   };
 
+  const filteredExecutions = useMemo(() => {
+    if (statusFilter === 'all') return executions;
+    return executions.filter(
+      (exec) => getStatusClass(exec.status || (exec.finished ? 'success' : 'running')) === statusFilter
+    );
+  }, [executions, statusFilter]);
+
   return (
     <div className="app">
       <div className="app-shell">
@@ -89,11 +105,26 @@ function Executions({ workflow, onBack }) {
               <p className="eyebrow">Execuções</p>
               <h1>{workflow.name || 'Untitled workflow'}</h1>
               <p className="subtitle">
-                Últimas {executions.length} execuções
+                Mostrando {filteredExecutions.length} de {executions.length} execuções
                 <span className={`pill-inline ${workflow.active ? 'pill-active' : 'pill-inactive'}`}>
                   {workflow.active ? 'Active' : 'Inactive'}
                 </span>
               </p>
+            </div>
+            <div className="status-filter-group">
+              <label htmlFor="status-filter">Filtrar por status</label>
+              <select
+                id="status-filter"
+                className="status-filter-select"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                {STATUS_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </header>
@@ -108,7 +139,11 @@ function Executions({ workflow, onBack }) {
           <div className="empty-state">Nenhuma execução encontrada para este workflow.</div>
         )}
 
-        {executions.length > 0 && (
+        {!loading && executions.length > 0 && filteredExecutions.length === 0 && (
+          <div className="empty-state">Nenhuma execução encontrada para este filtro.</div>
+        )}
+
+        {filteredExecutions.length > 0 && (
           <div className="executions-table-wrapper">
             <table className="executions-table">
               <thead>
@@ -121,7 +156,7 @@ function Executions({ workflow, onBack }) {
                 </tr>
               </thead>
               <tbody>
-                {executions.map((exec) => (
+                {filteredExecutions.map((exec) => (
                   <tr key={exec.id} className={`exec-row status-${getStatusClass(exec.status || (exec.finished ? 'success' : 'running'))}`}>
                     <td className="exec-id">#{exec.id}</td>
                     <td>

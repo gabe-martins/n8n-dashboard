@@ -64,6 +64,7 @@ tar -czf "$TMP_TAR" \
   --exclude='backend/node_modules' \
   --exclude='build' \
   --exclude='.env*' \
+  --exclude='backups' \
   .
 
 REMOTE_TMP="/tmp/$(basename "$TMP_TAR")"

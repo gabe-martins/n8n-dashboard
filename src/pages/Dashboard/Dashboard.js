@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 import { requestJson } from '../../services/api';
 import './Dashboard.css';
 
@@ -76,6 +77,9 @@ function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring, onOpenU
             : item
         )
       );
+      toast.success(
+        `Workflow "${workflow.name || 'Untitled'}" ${targetAction === 'activate' ? 'ativado' : 'desativado'} com sucesso.`
+      );
     } catch (err) {
       setError(err?.message || 'Falha ao atualizar workflow.');
     } finally {
@@ -105,6 +109,9 @@ function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring, onOpenU
               }
             : item
         )
+      );
+      toast.success(
+        `Workflow "${workflow.name || 'Untitled'}" ${targetAction === 'archive' ? 'arquivado' : 'desarquivado'} com sucesso.`
       );
     } catch (err) {
       setError(err?.message || 'Falha ao arquivar/desarquivar workflow.');

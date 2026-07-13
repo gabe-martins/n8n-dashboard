@@ -38,6 +38,43 @@
   vertical-align: middle;
 }
 
+.status-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-filter-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.status-filter-select {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg, var(--card-bg));
+  color: var(--ink);
+  font-size: 0.9rem;
+  min-width: 180px;
+  cursor: pointer;
+}
+
+.status-filter-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (max-width: 720px) {
+  .executions-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* Table */
 .executions-table-wrapper {
   overflow-x: auto;

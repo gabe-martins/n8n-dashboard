@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import { requestJson } from '../../services/api';
 import './Users.css';
 
@@ -9,13 +10,14 @@ function Users({ currentUser, onBack }) {
   const [loading, setLoading] = useState(false);
   const [busyIds, setBusyIds] = useState({});
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const markBusy = (id, isBusy) => {
     setBusyIds((prev) => ({ ...prev, [id]: isBusy }));
@@ -87,7 +89,7 @@ function Users({ currentUser, onBack }) {
             activated: formData.activated,
           }),
         });
-        setSuccessMsg('Usuário criado com sucesso.');
+        toast.success('Usuário criado com sucesso.');
       } else {
         await requestJson(`/api/users/${formData.id}`, {
           method: 'PUT',
@@ -104,7 +106,7 @@ function Users({ currentUser, onBack }) {
             body: JSON.stringify({ password: formData.password }),
           });
         }
-        setSuccessMsg('Usuário atualizado com sucesso.');
+        toast.success('Usuário atualizado com sucesso.');
       }
 
       closeForm();
@@ -124,6 +126,7 @@ function Users({ currentUser, onBack }) {
         method: 'PUT',
         body: JSON.stringify({ activated: !user.activated }),
       });
+      toast.success(`Usuário ${user.activated ? 'desativado' : 'ativado'} com sucesso.`);
       await loadUsers();
     } catch (err) {
       setError(err?.message || 'Falha ao atualizar usuário.');
@@ -132,20 +135,32 @@ function Users({ currentUser, onBack }) {
     }
   };
 
-  const handleDelete = async (user) => {
-    if (!window.confirm(`Excluir o usuário "${user.name}"? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
+  const requestDelete = (user) => {
+    setDeleteTarget(user);
+  };
 
+  const cancelDelete = () => {
+    if (deleteSubmitting) return;
+    setDeleteTarget(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const user = deleteTarget;
+
+    setDeleteSubmitting(true);
     markBusy(user.id, true);
     setError('');
     try {
       await requestJson(`/api/users/${user.id}`, { method: 'DELETE' });
-      setSuccessMsg('Usuário excluído com sucesso.');
+      toast.success('Usuário excluído com sucesso.');
+      setDeleteTarget(null);
       await loadUsers();
     } catch (err) {
       setError(err?.message || 'Falha ao excluir usuário.');
+      setDeleteTarget(null);
     } finally {
+      setDeleteSubmitting(false);
       markBusy(user.id, false);
     }
   };
@@ -178,7 +193,6 @@ function Users({ currentUser, onBack }) {
         </header>
 
         {error && <div className="banner error">{error}</div>}
-        {successMsg && !error && <div className="banner success">{successMsg}</div>}
 
         {formOpen && (
           <section className="user-form-card">
@@ -314,7 +328,7 @@ function Users({ currentUser, onBack }) {
                           </button>
                           <button
                             className="btn ghost danger"
-                            onClick={() => handleDelete(user)}
+                            onClick={() => requestDelete(user)}
                             disabled={isBusy || isSelf}
                           >
                             Excluir
@@ -326,6 +340,32 @@ function Users({ currentUser, onBack }) {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {deleteTarget && (
+          <div className="modal-overlay" role="presentation" onClick={cancelDelete}>
+            <div
+              className="modal-card"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="confirm-delete-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="confirm-delete-title">Excluir usuário</h2>
+              <p>
+                Tem certeza que deseja excluir o usuário <strong>"{deleteTarget.name}"</strong>?
+                Esta ação não pode ser desfeita.
+              </p>
+              <div className="modal-actions">
+                <button className="btn ghost" onClick={cancelDelete} disabled={deleteSubmitting}>
+                  Cancelar
+                </button>
+                <button className="btn danger-solid" onClick={confirmDelete} disabled={deleteSubmitting}>
+                  {deleteSubmitting ? 'Excluindo...' : 'Excluir'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

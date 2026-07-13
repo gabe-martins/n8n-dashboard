@@ -1,5 +1,7 @@
 import './App.css';
+import 'react-toastify/dist/ReactToastify.css';
 import { useEffect, useState } from 'react';
+import { ToastContainer } from 'react-toastify';
 import { backendUrl } from './services/api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -139,6 +141,12 @@ function App() {
     <>
       <ThemeToggle />
       {content}
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        newestOnTop
+        theme="colored"
+      />
     </>
   );
 }
