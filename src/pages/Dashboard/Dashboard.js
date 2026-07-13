@@ -12,6 +12,7 @@ function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring, onOpenU
   const [busyIds, setBusyIds] = useState({});
   const [lastUpdated, setLastUpdated] = useState(null);
   const [n8nStatus, setN8nStatus] = useState({ connected: true, message: '' });
+  const [searchTerm, setSearchTerm] = useState('');
 
   const isAdmin = (user?.tag || '').toLowerCase() === 'admin';
 
@@ -42,12 +43,16 @@ function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring, onOpenU
   }, []);
 
   const sortedWorkflows = useMemo(() => {
-    return [...workflows].sort((a, b) => {
+    const term = searchTerm.trim().toLowerCase();
+    const base = term
+      ? workflows.filter((wf) => (wf.name || '').toLowerCase().includes(term))
+      : workflows;
+    return [...base].sort((a, b) => {
       const nameA = (a.name || '').toLowerCase();
       const nameB = (b.name || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
-  }, [workflows]);
+  }, [workflows, searchTerm]);
 
   useEffect(() => {
     loadWorkflows();
@@ -164,13 +169,28 @@ function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring, onOpenU
         </header>
 
         {!n8nStatus.connected && (
-          <div className="banner">
+          <div className="banner" role="alert">
             Não foi possível conectar ao n8n. Verifique `N8N_API_KEY` e `N8N_BASE_URL`
             na configuração do backend.
           </div>
         )}
 
-        {error && <div className="banner error">{error}</div>}
+        {error && <div className="banner error" role="alert">{error}</div>}
+
+        <div className="search-row">
+          <label htmlFor="workflow-search" className="sr-only">
+            Buscar workflow por nome
+          </label>
+          <input
+            id="workflow-search"
+            type="search"
+            className="workflow-search-input"
+            placeholder="Buscar workflow por nome..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Buscar workflow por nome"
+          />
+        </div>
 
         <section className="cards-grid">
           {sortedWorkflows.map((workflow) => {
@@ -227,11 +247,15 @@ function Dashboard({ user, onLogout, onSelectWorkflow, onOpenMonitoring, onOpenU
           })}
 
           {!loading && sortedWorkflows.length === 0 && !error && (
-            <div className="empty-state">No workflows found.</div>
+            <div className="empty-state">
+              {searchTerm ? 'Nenhum workflow corresponde à busca.' : 'No workflows found.'}
+            </div>
           )}
 
           {loading && workflows.length === 0 && (
-            <div className="empty-state">Loading workflows...</div>
+            <div className="empty-state" role="status" aria-live="polite">
+              Loading workflows...
+            </div>
           )}
         </section>
       </div>

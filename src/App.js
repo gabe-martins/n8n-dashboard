@@ -1,14 +1,31 @@
 import './App.css';
 import 'react-toastify/dist/ReactToastify.css';
-import { useEffect, useState } from 'react';
+// Eagerly import every page's CSS (even though the *components* below are
+// lazy-loaded). Several pages reuse classes defined in another page's CSS
+// file (e.g. Monitoring's and Users' history/user tables reuse
+// `.executions-table`/`.banner`/`.pill` from Executions.css/Dashboard.css).
+// If CSS were left to code-split alongside each JS chunk, opening
+// Monitoring or Users before ever opening Executions would leave those
+// shared table styles unloaded, rendering an unstyled table. Importing the
+// CSS here keeps it all in the main bundle (small, ~a few KB total) while
+// the JS chunks themselves still load lazily.
+import './pages/Dashboard/Dashboard.css';
+import './pages/Executions/Executions.css';
+import './pages/Monitoring/Monitoring.css';
+import './pages/Users/Users.css';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { ToastContainer } from 'react-toastify';
 import { backendUrl } from './services/api';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Executions from './pages/Executions';
-import Monitoring from './pages/Monitoring';
-import Users from './pages/Users';
 import ThemeToggle from './components/ThemeToggle';
+
+// Lazy-loaded: these screens aren't needed until after login, so splitting
+// them into separate JS chunks keeps the initial bundle (login screen)
+// smaller. Their CSS is imported eagerly above (see comment there).
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Executions = lazy(() => import('./pages/Executions'));
+const Monitoring = lazy(() => import('./pages/Monitoring'));
+const Users = lazy(() => import('./pages/Users'));
 
 function App() {
   const [user, setUser] = useState(null);
@@ -140,7 +157,17 @@ function App() {
   return (
     <>
       <ThemeToggle />
-      {content}
+      <Suspense
+        fallback={
+          <div className="app">
+            <div className="loading-screen" role="status" aria-live="polite">
+              <p>Carregando...</p>
+            </div>
+          </div>
+        }
+      >
+        {content}
+      </Suspense>
       <ToastContainer
         position="top-right"
         autoClose={4000}

@@ -192,14 +192,14 @@ function Users({ currentUser, onBack }) {
           </div>
         </header>
 
-        {error && <div className="banner error">{error}</div>}
+        {error && <div className="banner error" role="alert">{error}</div>}
 
         {formOpen && (
           <section className="user-form-card">
             <h2 className="section-title">
               {formMode === 'create' ? 'Novo usuário' : `Editar usuário: ${formData.name}`}
             </h2>
-            {formError && <div className="banner error">{formError}</div>}
+            {formError && <div className="banner error" role="alert">{formError}</div>}
             <form onSubmit={handleFormSubmit} className="user-form">
               <div className="form-group">
                 <label htmlFor="user-name">Nome</label>
@@ -276,7 +276,9 @@ function Users({ currentUser, onBack }) {
         )}
 
         {loading && users.length === 0 && (
-          <div className="empty-state">Carregando usuários...</div>
+          <div className="empty-state" role="status" aria-live="polite">
+            Carregando usuários...
+          </div>
         )}
 
         {!loading && users.length === 0 && !error && (

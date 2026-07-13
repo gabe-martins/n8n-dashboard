@@ -68,6 +68,12 @@
   outline-offset: 1px;
 }
 
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
 @media (max-width: 720px) {
   .executions-title-row {
     flex-direction: column;

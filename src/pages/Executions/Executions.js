@@ -3,6 +3,7 @@ import { requestJson } from '../../services/api';
 import './Executions.css';
 
 const REFRESH_INTERVAL_MS = 15000;
+const PAGE_SIZE = 50;
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'Todos os status' },
@@ -15,8 +16,10 @@ const STATUS_FILTERS = [
 function Executions({ workflow, onBack }) {
   const [executions, setExecutions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [nextCursor, setNextCursor] = useState(null);
 
   const loadExecutions = useCallback(async () => {
     if (!workflow?.id) return;
@@ -26,18 +29,43 @@ function Executions({ workflow, onBack }) {
 
     try {
       const payload = await requestJson(
-        `/api/n8n/executions?workflowId=${workflow.id}&limit=200`
+        `/api/n8n/executions?workflowId=${workflow.id}&limit=${PAGE_SIZE}`
       );
 
       const items = Array.isArray(payload?.data) ? payload.data : [];
 
       setExecutions(items);
+      setNextCursor(payload?.nextCursor || null);
     } catch (err) {
       setError(err?.message || 'Failed to load executions.');
     } finally {
       setLoading(false);
     }
   }, [workflow]);
+
+  // Fetches the next page (via n8n's cursor) and appends it to what's
+  // already loaded, instead of the previous fixed limit=200 single fetch.
+  const loadMore = useCallback(async () => {
+    if (!workflow?.id || !nextCursor || loadingMore) return;
+
+    setLoadingMore(true);
+    setError('');
+
+    try {
+      const payload = await requestJson(
+        `/api/n8n/executions?workflowId=${workflow.id}&limit=${PAGE_SIZE}&cursor=${encodeURIComponent(nextCursor)}`
+      );
+
+      const items = Array.isArray(payload?.data) ? payload.data : [];
+
+      setExecutions((prev) => [...prev, ...items]);
+      setNextCursor(payload?.nextCursor || null);
+    } catch (err) {
+      setError(err?.message || 'Falha ao carregar mais execuções.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [workflow, nextCursor, loadingMore]);
 
   useEffect(() => {
     loadExecutions();
@@ -129,10 +157,12 @@ function Executions({ workflow, onBack }) {
           </div>
         </header>
 
-        {error && <div className="banner error">{error}</div>}
+        {error && <div className="banner error" role="alert">{error}</div>}
 
         {loading && executions.length === 0 && (
-          <div className="empty-state">Carregando execuções...</div>
+          <div className="empty-state" role="status" aria-live="polite">
+            Carregando execuções...
+          </div>
         )}
 
         {!loading && executions.length === 0 && !error && (
@@ -179,6 +209,14 @@ function Executions({ workflow, onBack }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {nextCursor && (
+          <div className="load-more-row">
+            <button className="btn ghost" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? 'Carregando...' : 'Carregar mais execuções'}
+            </button>
           </div>
         )}
       </div>

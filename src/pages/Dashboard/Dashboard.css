@@ -59,6 +59,21 @@
   gap: 12px;
 }
 
+.search-row {
+  display: flex;
+}
+
+.workflow-search-input {
+  width: 100%;
+  max-width: 360px;
+  padding: 10px 16px;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  background: var(--input-bg, var(--card-bg));
+  color: var(--ink);
+}
+
 .status-chip {
   padding: 6px 12px;
   border-radius: 999px;
