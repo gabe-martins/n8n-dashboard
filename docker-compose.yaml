@@ -102,7 +102,7 @@ services:
     container_name: n8n-dashboard-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "6060:80"
     depends_on:
       backend:
         condition: service_healthy
