@@ -1,0 +1,377 @@
+{
+  "name": "Newsletter Diária - Groq + Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Newsletter Diária (Groq + Telegram)\n\n**Antes de ativar:**\n1. Edite o nó \"Parâmetros da Newsletter\" com os sites (feeds RSS), temas de interesse e o chatId do Telegram.\n2. Crie a credencial `Groq API (Header Auth)` do tipo *Header Auth* com Name = `Authorization` e Value = `Bearer SEU_GROQ_API_KEY` e selecione-a nos dois nós HTTP Request (\"Groq - ...\").\n3. Crie/selecione a credencial do Telegram (`Telegram API`) nos nós \"Enviar Newsletter\" e \"Enviar Aviso Sem Notícias\".\n4. Ative o workflow. Ele roda todo dia às 8h (cron `0 8 * * *`).\n\n**Otimização de tokens aplicada:**\n- Filtra, deduplica e corta cada notícia para ~250 caracteres antes de qualquer chamada de LLM.\n- Limita a lista a 40 notícias mais recentes.\n- 1ª LLM (modelo pequeno/rápido, temperatura 0) apenas devolve os ÍNDICES das notícias escolhidas (saída mínima).\n- 2ª LLM (modelo maior) só é chamada uma vez, com a lista já reduzida às notícias selecionadas.\n- `max_tokens` definido explicitamente nas duas chamadas."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1180, -40],
+      "id": "sticky-note-instrucoes",
+      "name": "Instruções"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1180, 300],
+      "id": "node-schedule-trigger",
+      "name": "Gatilho Diário 8h"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-sites",
+              "name": "sites",
+              "type": "array",
+              "value": "=[\"https://techcrunch.com/feed/\", \"https://www.theverge.com/rss/index.xml\", \"https://feeds.bbci.co.uk/news/technology/rss.xml\"]"
+            },
+            {
+              "id": "assign-temas",
+              "name": "temas",
+              "type": "array",
+              "value": "=[\"inteligência artificial\", \"tecnologia\", \"startups\"]"
+            },
+            {
+              "id": "assign-dias",
+              "name": "diasAtras",
+              "type": "number",
+              "value": 2
+            },
+            {
+              "id": "assign-max",
+              "name": "maxNoticiasSelecionadas",
+              "type": "number",
+              "value": 8
+            },
+            {
+              "id": "assign-chat",
+              "name": "telegramChatId",
+              "type": "string",
+              "value": "SEU_CHAT_ID_AQUI"
+            },
+            {
+              "id": "assign-modelo-selecao",
+              "name": "modeloSelecao",
+              "type": "string",
+              "value": "llama-3.1-8b-instant"
+            },
+            {
+              "id": "assign-modelo-resumo",
+              "name": "modeloResumo",
+              "type": "string",
+              "value": "llama-3.3-70b-versatile"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-940, 300],
+      "id": "node-parametros",
+      "name": "Parâmetros da Newsletter"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "sites",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-700, 300],
+      "id": "node-split-sites",
+      "name": "Separar Sites"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.sites }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [-460, 300],
+      "id": "node-rss-read",
+      "name": "Ler Feed RSS"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reduz cada item de feed ao mínimo necessário e filtra pelos últimos N dias (otimização de tokens)\nconst items = $input.all();\nconst diasAtras = $('Parâmetros da Newsletter').first().json.diasAtras || 2;\nconst limite = new Date();\nlimite.setDate(limite.getDate() - diasAtras);\n\nconst vistos = new Set();\nconst resultado = [];\n\nfor (const item of items) {\n  const j = item.json;\n  const dataPub = j.pubDate || j.isoDate || j.publishedDate;\n  const data = dataPub ? new Date(dataPub) : null;\n  if (!data || isNaN(data.getTime()) || data < limite) continue;\n\n  const link = j.link || j.guid || '';\n  if (!link || vistos.has(link)) continue;\n  vistos.add(link);\n\n  const textoBase = (j.contentSnippet || j.summary || j.content || '')\n    .replace(/<[^>]*>/g, '')\n    .trim();\n\n  let fonte = j.creator || j.author || '';\n  if (!fonte && link) {\n    try { fonte = new URL(link).hostname; } catch (e) { fonte = ''; }\n  }\n\n  resultado.push({\n    json: {\n      titulo: (j.title || '').trim(),\n      link,\n      fonte,\n      dataPublicacao: data.toISOString(),\n      resumoOriginal: textoBase.slice(0, 250)\n    }\n  });\n}\n\nresultado.sort((a, b) => new Date(b.json.dataPublicacao) - new Date(a.json.dataPublicacao));\nreturn resultado.slice(0, 40);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-220, 300],
+      "id": "node-reduzir-campos",
+      "name": "Reduzir Campos (Otimização de Tokens)"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "noticias",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [20, 300],
+      "id": "node-aggregate",
+      "name": "Agrupar Todas as Notícias"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-tem-noticias",
+              "leftValue": "={{ $json.noticias.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [260, 300],
+      "id": "node-if-tem-noticias",
+      "name": "Existem Notícias?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta uma lista indexada e compacta para a LLM de seleção (menos tokens = índice numérico + título curto)\nconst noticias = $json.noticias;\nconst listaIndexada = noticias\n  .map((n, i) => `${i}. [${n.titulo}] (Fonte: ${n.fonte}) - ${n.resumoOriginal}`)\n  .join(' | ');\n\nreturn [{ json: { noticias, listaIndexada } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 200],
+      "id": "node-preparar-prompt-selecao",
+      "name": "Preparar Prompt de Seleção"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $('Parâmetros da Newsletter').first().json.modeloSelecao, temperature: 0, max_tokens: 300, messages: [ { role: 'system', content: 'Você é um editor de notícias eficiente. Sua tarefa é escolher apenas os índices das notícias mais relevantes e importantes para os temas fornecidos, evitando duplicidade de assunto. Responda somente com um array JSON de números, sem nenhum texto adicional. Exemplo de resposta válida: [0,3,7]' }, { role: 'user', content: 'Temas de interesse: ' + $('Parâmetros da Newsletter').first().json.temas.join(', ') + '. Selecione no máximo ' + $('Parâmetros da Newsletter').first().json.maxNoticiasSelecionadas + ' notícias mais importantes e relevantes da lista a seguir, o índice começa em 0: ' + $json.listaIndexada } ] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 200],
+      "id": "node-groq-selecao",
+      "name": "Groq - Selecionar Notícias Importantes",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GROQ_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Groq API (Header Auth)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrai os índices retornados pela LLM de seleção e reconstrói a lista completa das notícias escolhidas\nconst resposta = $input.first().json.choices[0].message.content;\nlet indices = [];\ntry {\n  const match = resposta.match(/\\[[\\s\\d,]*\\]/);\n  indices = JSON.parse(match ? match[0] : resposta);\n} catch (e) {\n  indices = [];\n}\n\nconst noticias = $('Preparar Prompt de Seleção').first().json.noticias;\nconst selecionadas = indices\n  .filter((i) => Number.isInteger(i) && noticias[i])\n  .map((i) => noticias[i]);\n\nreturn [{ json: { selecionadas } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 200],
+      "id": "node-mapear-indices",
+      "name": "Mapear Índices Selecionados"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $('Parâmetros da Newsletter').first().json.modeloResumo, temperature: 0.6, max_tokens: 1500, messages: [ { role: 'system', content: 'Você é um redator de newsletters para o Telegram. Escreva de forma curta e envolvente, usando emojis relevantes ao conteúdo. Utilize a formatação MarkdownV2 do Telegram: negrito com asteriscos, links no formato [texto](url) e listas com o caractere •. Escape corretamente os caracteres especiais do MarkdownV2 fora dos elementos de formatação: _ * [ ] ( ) ~ ` > # + - = | { } . !. Responda apenas com o texto final da mensagem, pronto para envio, sem comentários extras e sem blocos de código.' }, { role: 'user', content: 'Escreva uma newsletter diária para o Telegram com base na lista de notícias em JSON abaixo. Comece com um título chamativo e a data de hoje, agrupe por tema quando fizer sentido, resuma cada notícia em uma ou duas frases, cite a fonte e inclua o link ao final de cada item. Notícias em JSON: ' + JSON.stringify($json.selecionadas) } ] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1220, 200],
+      "id": "node-groq-redacao",
+      "name": "Groq - Redigir Newsletter",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GROQ_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Groq API (Header Auth)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrai o texto final e divide em blocos de até 4096 caracteres (limite do Telegram)\nconst texto = $input.first().json.choices[0].message.content.trim();\nconst LIMITE = 4096;\nconst partes = [];\nfor (let i = 0; i < texto.length; i += LIMITE) {\n  partes.push(texto.slice(i, i + LIMITE));\n}\nreturn partes.map((p) => ({ json: { mensagem: p } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1460, 200],
+      "id": "node-preparar-mensagem",
+      "name": "Preparar Mensagem para Envio"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Parâmetros da Newsletter').first().json.telegramChatId }}",
+        "text": "={{ $json.mensagem }}",
+        "additionalFields": {
+          "parse_mode": "MarkdownV2"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1700, 200],
+      "id": "node-enviar-telegram",
+      "name": "Enviar Newsletter",
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_BOT_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Parâmetros da Newsletter').first().json.telegramChatId }}",
+        "text": "=🗞️ *Newsletter Diária*\n\nNenhuma notícia relevante foi encontrada nos últimos {{ $('Parâmetros da Newsletter').first().json.diasAtras }} dias.",
+        "additionalFields": {
+          "parse_mode": "MarkdownV2"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [500, 420],
+      "id": "node-enviar-aviso-vazio",
+      "name": "Enviar Aviso Sem Notícias",
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_BOT_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gatilho Diário 8h": {
+      "main": [
+        [
+          { "node": "Parâmetros da Newsletter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parâmetros da Newsletter": {
+      "main": [
+        [
+          { "node": "Separar Sites", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Separar Sites": {
+      "main": [
+        [
+          { "node": "Ler Feed RSS", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Ler Feed RSS": {
+      "main": [
+        [
+          { "node": "Reduzir Campos (Otimização de Tokens)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Reduzir Campos (Otimização de Tokens)": {
+      "main": [
+        [
+          { "node": "Agrupar Todas as Notícias", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Agrupar Todas as Notícias": {
+      "main": [
+        [
+          { "node": "Existem Notícias?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Existem Notícias?": {
+      "main": [
+        [
+          { "node": "Preparar Prompt de Seleção", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Enviar Aviso Sem Notícias", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Preparar Prompt de Seleção": {
+      "main": [
+        [
+          { "node": "Groq - Selecionar Notícias Importantes", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Groq - Selecionar Notícias Importantes": {
+      "main": [
+        [
+          { "node": "Mapear Índices Selecionados", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Mapear Índices Selecionados": {
+      "main": [
+        [
+          { "node": "Groq - Redigir Newsletter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Groq - Redigir Newsletter": {
+      "main": [
+        [
+          { "node": "Preparar Mensagem para Envio", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Preparar Mensagem para Envio": {
+      "main": [
+        [
+          { "node": "Enviar Newsletter", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "newsletter-groq-telegram-template"
+  }
+}

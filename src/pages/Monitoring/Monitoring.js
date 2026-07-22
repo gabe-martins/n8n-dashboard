@@ -1,6 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { requestJson } from '../../services/api';
 import './Monitoring.css';
+
+const MODE_LABELS = {
+  manual: 'Manual',
+  trigger: 'Trigger',
+  webhook: 'Webhook',
+  retry: 'Repetição',
+  cli: 'CLI',
+  error: 'Erro',
+  integrated: 'Integrado',
+  internal: 'Interno',
+  scheduled: 'Agendado',
+  evaluation: 'Avaliação',
+};
 
 // Near-real-time polling: fast enough to feel "live" without hammering the
 // n8n API/backend on the memory-constrained production host. Paused while
@@ -39,6 +52,53 @@ function getStatusClass(status) {
   if (s === 'error' || s === 'crashed') return 'error';
   if (s === 'running' || s === 'waiting' || s === 'new') return 'running';
   return 'unknown';
+}
+
+function computeStatsFromExecutions(execs) {
+  if (!execs.length) return null;
+  const statusBreakdown = {};
+  let totalDuration = 0;
+  let durationCount = 0;
+  const timelineMap = {};
+  const workflowMap = {};
+
+  for (const exec of execs) {
+    const status = (exec.status || (exec.finished ? 'success' : 'running')).toLowerCase();
+    statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+
+    if (exec.startedAt && exec.stoppedAt) {
+      const ms = new Date(exec.stoppedAt) - new Date(exec.startedAt);
+      if (Number.isFinite(ms) && ms >= 0) {
+        totalDuration += ms;
+        durationCount++;
+      }
+    }
+
+    if (exec.startedAt) {
+      const date = exec.startedAt.slice(0, 10);
+      if (!timelineMap[date]) timelineMap[date] = { date, total: 0, error: 0 };
+      timelineMap[date].total++;
+      if (status === 'error' || status === 'crashed') timelineMap[date].error++;
+    }
+
+    const wfId = exec.workflowId || exec.workflowName || 'unknown';
+    if (!workflowMap[wfId]) {
+      workflowMap[wfId] = { workflowId: wfId, workflowName: exec.workflowName || wfId, total: 0, error: 0 };
+    }
+    workflowMap[wfId].total++;
+    if (status === 'error' || status === 'crashed') workflowMap[wfId].error++;
+  }
+
+  const total = execs.length;
+  const successCount = statusBreakdown.success || 0;
+  return {
+    totalAnalyzed: total,
+    successRate: total > 0 ? Math.round((successCount / total) * 100) : 0,
+    avgDurationMs: durationCount > 0 ? Math.round(totalDuration / durationCount) : null,
+    statusBreakdown,
+    timeline: Object.values(timelineMap).sort((a, b) => a.date.localeCompare(b.date)),
+    topWorkflows: Object.values(workflowMap).sort((a, b) => b.total - a.total).slice(0, 10),
+  };
 }
 
 function StatusBreakdownChart({ data, total }) {
@@ -153,6 +213,72 @@ function TopWorkflowsChart({ data }) {
   );
 }
 
+function ModeFilterDropdown({ options, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleMode = (mode) => {
+    if (selected.includes(mode)) {
+      onChange(selected.filter((m) => m !== mode));
+    } else {
+      onChange([...selected, mode]);
+    }
+  };
+
+  const label =
+    selected.length === 0
+      ? 'Todos os modos'
+      : selected.length === 1
+      ? MODE_LABELS[selected[0]] || selected[0]
+      : `${selected.length} modos selecionados`;
+
+  return (
+    <div className="mode-filter-group" ref={containerRef}>
+      <span className="mode-filter-label">Filtrar por modo de execução</span>
+      <button
+        type="button"
+        className="mode-filter-toggle"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span>{label}</span>
+        <span className="mode-filter-caret">▾</span>
+      </button>
+      {open && (
+        <div className="mode-filter-panel" role="listbox" aria-multiselectable="true">
+          {options.length === 0 && <p className="mode-filter-empty">Sem modos disponíveis.</p>}
+          {options.map((mode) => (
+            <label key={mode} className="mode-filter-option">
+              <input
+                type="checkbox"
+                checked={selected.includes(mode)}
+                onChange={() => toggleMode(mode)}
+              />
+              {MODE_LABELS[mode] || mode}
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <button type="button" className="mode-filter-clear" onClick={() => onChange([])}>
+              Limpar filtro
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Monitoring({ onBack }) {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -160,6 +286,7 @@ function Monitoring({ onBack }) {
   const [nextCursor, setNextCursor] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState('');
+  const [modeFilter, setModeFilter] = useState([]);
   const isRefreshingRef = useRef(false);
 
   const loadStats = useCallback(async () => {
@@ -246,6 +373,24 @@ function Monitoring({ onBack }) {
 
   const loading = statsLoading || historyLoading;
 
+  const availableModes = useMemo(() => {
+    const set = new Set();
+    executions.forEach((exec) => {
+      if (exec.mode) set.add(exec.mode);
+    });
+    return Array.from(set).sort();
+  }, [executions]);
+
+  const filteredExecutions = useMemo(() => {
+    if (modeFilter.length === 0) return executions;
+    return executions.filter((exec) => modeFilter.includes(exec.mode));
+  }, [executions, modeFilter]);
+
+  const displayStats = useMemo(() => {
+    if (modeFilter.length === 0) return stats;
+    return computeStatsFromExecutions(filteredExecutions);
+  }, [modeFilter, stats, filteredExecutions]);
+
   return (
     <div className="app">
       <div className="app-shell">
@@ -270,6 +415,7 @@ function Monitoring({ onBack }) {
                 automaticamente a cada {REFRESH_INTERVAL_MS / 1000} segundos.
               </p>
             </div>
+            <ModeFilterDropdown options={availableModes} selected={modeFilter} onChange={setModeFilter} />
           </div>
         </header>
 
@@ -278,30 +424,36 @@ function Monitoring({ onBack }) {
         <section className="kpi-grid">
           <div className="kpi-card">
             <span className="label">Analisadas</span>
-            <strong>{stats?.totalAnalyzed ?? '—'}</strong>
+            <strong>{displayStats?.totalAnalyzed ?? '—'}</strong>
           </div>
           <div className="kpi-card">
             <span className="label">Taxa de sucesso</span>
-            <strong>{stats?.successRate != null ? `${stats.successRate}%` : '—'}</strong>
+            <strong>{displayStats?.successRate != null ? `${displayStats.successRate}%` : '—'}</strong>
           </div>
           <div className="kpi-card">
             <span className="label">Duração média</span>
             <strong>
-              {stats?.avgDurationMs != null ? formatDuration(0, stats.avgDurationMs) : '—'}
+              {displayStats?.avgDurationMs != null ? formatDuration(0, displayStats.avgDurationMs) : '—'}
             </strong>
           </div>
           <div className="kpi-card">
             <span className="label">Erros</span>
             <strong className="kpi-danger">
-              {stats ? (stats.statusBreakdown.error || 0) + (stats.statusBreakdown.crashed || 0) : '—'}
+              {displayStats ? (displayStats.statusBreakdown.error || 0) + (displayStats.statusBreakdown.crashed || 0) : '—'}
             </strong>
           </div>
         </section>
 
+        {modeFilter.length > 0 && (
+          <p className="filter-stats-note">
+            Estatísticas calculadas a partir das {filteredExecutions.length} execuções carregadas com o filtro ativo.
+          </p>
+        )}
+
         <section className="charts-grid">
-          <StatusBreakdownChart data={stats?.statusBreakdown} total={stats?.totalAnalyzed} />
-          <TimelineChart data={stats?.timeline || []} />
-          <TopWorkflowsChart data={stats?.topWorkflows || []} />
+          <StatusBreakdownChart data={displayStats?.statusBreakdown} total={displayStats?.totalAnalyzed} />
+          <TimelineChart data={displayStats?.timeline || []} />
+          <TopWorkflowsChart data={displayStats?.topWorkflows || []} />
         </section>
 
         <section>
@@ -315,7 +467,11 @@ function Monitoring({ onBack }) {
             <div className="empty-state">Nenhuma execução encontrada.</div>
           )}
 
-          {executions.length > 0 && (
+          {!historyLoading && executions.length > 0 && filteredExecutions.length === 0 && (
+            <div className="empty-state">Nenhuma execução encontrada para este filtro.</div>
+          )}
+
+          {filteredExecutions.length > 0 && (
             <>
               <div className="executions-table-wrapper">
                 <table className="executions-table">
@@ -330,7 +486,7 @@ function Monitoring({ onBack }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {executions.map((exec) => {
+                    {filteredExecutions.map((exec) => {
                       const statusValue = exec.status || (exec.finished ? 'success' : 'running');
                       return (
                         <tr key={exec.id} className={`exec-row status-${getStatusClass(statusValue)}`}>

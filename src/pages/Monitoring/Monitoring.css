@@ -229,6 +229,113 @@
   margin-top: 16px;
 }
 
+.filter-stats-note {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.mode-filter-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mode-filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mode-filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg, var(--card-bg));
+  color: var(--ink);
+  font-size: 0.9rem;
+  min-width: 200px;
+  cursor: pointer;
+}
+
+.mode-filter-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.mode-filter-caret {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.mode-filter-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  min-width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+}
+
+.mode-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.mode-filter-option:hover {
+  background: var(--soft-bg);
+}
+
+.mode-filter-option input {
+  cursor: pointer;
+}
+
+.mode-filter-empty {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.mode-filter-clear {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.mode-filter-clear:hover {
+  background: var(--soft-bg);
+}
+
 @media (max-width: 720px) {
   .bar-row {
     grid-template-columns: 80px 1fr auto;
